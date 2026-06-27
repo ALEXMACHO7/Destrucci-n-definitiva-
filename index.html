@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Evento: Ciudad en Ruinas</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0f172a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .estado-juego {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            padding: 10px 20px;
+            border-radius: 12px;
+            background: #1e293b;
+            border: 2px solid #00fff0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            max-width: 90%;
+        }
+
+        /* --- ELEMENTO CIUDAD --- */
+        .ciudad-objeto {
+            font-size: 110px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
+        .ciudad-objeto:active {
+            transform: scale(0.85);
+        }
+
+        /* Animación de brillo intenso para cuando detecta Mascota */
+        .brillo-intenso {
+            animation: superBrillo 0.4s infinite alternate ease-in-out;
+        }
+
+        @keyframes superBrillo {
+            from {
+                filter: drop-shadow(0 0 10px #ffaa00) brightness(1);
+                transform: scale(1);
+            }
+            to {
+                filter: drop-shadow(0 0 35px #ffaa00) brightness(1.4);
+                transform: scale(1.05);
+            }
+        }
+
+        /* --- POP-UP DE PREMIOS --- */
+        .pantalla-premio {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.96);
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            padding: 20px;
+        }
+
+        .tarjeta-premio {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 25px;
+            border: 3px solid #ffaa00;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.4);
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .icono-moneda {
+            font-size: 70px;
+            margin: 15px 0;
+            display: inline-block;
+        }
+
+        .boton-cerrar {
+            background-color: #ffaa00;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        /* --- INTERFAZ FIJA DE BLOQUEO PARA ALEX --- */
+        .contenedor-bloqueo {
+            display: none;
+            background: #1e293b;
+            border: 2px solid #ff3366;
+            padding: 25px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .indicacion-alex {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00fff0;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px dashed #00fff0;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="interfaz-juego" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+        <div class="estado-juego" id="texto-estado">¡Toca la ciudad!</div>
+        <div class="ciudad-objeto" id="ciudad-btn" onclick="registrarToque()">🏙️</div>
+    </div>
+
+    <div class="contenedor-bloqueo" id="interfaz-bloqueo">
+        <h2 style="color: #ff3366; margin-top: 0; font-size: 22px;">¡Recompensa Reclamada!</h2>
+        <p style="color: #ccc; font-size: 15px; margin-bottom: 5px;">Tu premio ya fue asignado:</p>
+        <div id="recompensa-texto" style="font-size: 19px; font-weight: bold; color: #ffaa00; margin: 10px 0;"></div>
+        <div class="indicacion-alex">quita una cap y mándaselo a Alex y reclama tu premio</div>
+    </div>
+
+    <div class="pantalla-premio" id="pantalla-premio">
+        <div class="tarjeta-premio">
+            <h2>¡LOGRADO!</h2>
+            <div class="icono-moneda">🪙</div>
+            <p id="texto-premio" style="font-size: 18px; font-weight: bold; margin: 10px 0;"></p>
+            <button class="boton-cerrar" onclick="guardarYBloquear()">Entendido</button>
+        </div>
+    </div>
+
+    <script>
+        const juegoContenedor = document.getElementById("interfaz-juego");
+        const bloqueoContenedor = document.getElementById("interfaz-bloqueo");
+        const ciudadBtn = document.getElementById("ciudad-btn");
+        const textoEstado = document.getElementById("texto-estado");
+
+        let contadorToques = 0;
+        let premioAsignado = null;
+        let totalToquesNecesarios = 4; // Por defecto son 4 para premios normales
+
+        // Lista de Premios y Porcentajes configurados exactamente
+        const listaPremios = [
+            { nombre: "1 huevo básico 🥚", tipo: "objeto", prob: 0.07 },
+            { nombre: "3 huevos jubilados 🥚🥚🥚", tipo: "objeto", prob: 0.05 },
+            { nombre: "100 crédito de bucks 💰", tipo: "objeto", prob: 0.03 },
+            { nombre: "400 crédito de bucks 💳", tipo: "objeto", prob: 0.02 },
+            { nombre: "1 caja de patito 🐥", tipo: "objeto", prob: 0.18 },
+            { nombre: "5 regalos pequeños 🎁", tipo: "objeto", prob: 0.10 },
+            // Mascotas (Suman el 55% restante de probabilidad)
+            { nombre: "Mascota: Castor 🦫", tipo: "mascota", prob: 0.15 },
+            { nombre: "Mascota: Alicornio 🦄", tipo: "mascota", prob: 0.15 },
+            { nombre: "Mascota: Ballena 🐳", tipo: "mascota", prob: 0.15 },
+            { nombre: "Mascota: Pez dorado 🐟", tipo: "mascota", prob: 0.10 }
+        ];
+
+        window.onload = function() {
+            if (localStorage.getItem("ciudadEventoAbierto") === "true") {
+                activarPantallaBloqueo();
+            } else {
+                // Pre-calcular el premio al cargar de forma secreta para saber cuántos toques requerirá
+                definirSuerte();
+            }
+        };
+
+        function activarPantallaBloqueo() {
+            juegoContenedor.style.display = "none";
+            const premioGuardado = localStorage.getItem("premioCiudadGanado") || "Premio Registrado";
+            document.getElementById("recompensa-texto").innerText = premioGuardado;
+            bloqueoContenedor.style.display = "block";
+        }
+
+        function definirSuerte() {
+            const azar = Math.random();
+            let suma = 0;
+            premioAsignado = listaPremios[listaPremios.length - 1];
+
+            for (let p of listaPremios) {
+                suma += p.prob;
+                if (azar <= suma) {
+                    premioAsignado = p;
+                    break;
+                }
+            }
+
+            // Si es mascota, configuramos 8 toques en total
+            if (premioAsignado.tipo === "mascota") {
+                totalToquesNecesarios = 8;
+            }
+        }
+
+        function registrarToque() {
+            if (localStorage.getItem("ciudadEventoAbierto") === "true") return;
+
+            contadorToques++;
+
+            // Cambios de estado visuales de la ciudad según los toques
+            if (contadorToques === 1) {
+                ciudadBtn.innerText = "🏚️"; // Se empieza a romper
+                textoEstado.innerText = "¡Sigue golpeando!";
+            }
+
+            // Al llegar al toque 4, si es una mascota, se activa el brillo intenso y pide 4 más
+            if (contadorToques === 4 && premioAsignado.tipo === "mascota") {
+                ciudadBtn.classList.add("brillo-intenso");
+                textoEstado.innerText = "¡La ciudad brilla! ¡4 toques más!";
+            }
+
+            // Verificar si ya cumplió con los toques que requería su premio
+            if (contadorToques >= totalToquesNecesarios) {
+                ciudadBtn.innerText = "💥"; // Destrucción total
+                setTimeout(() => {
+                    lanzarPremio();
+                }, 200);
+            }
+        }
+
+        function lanzarPremio() {
+            // Guardar al instante en la memoria local del celular para bloquearlo
+            localStorage.setItem("ciudadEventoAbierto", "true");
+            localStorage.setItem("premioCiudadGanado", premioAsignado.nombre);
+
+            // Cargar datos en el Pop-up
+            document.getElementById("texto-premio").innerText = "Ganaste: " + premioAsignado.nombre;
+            document.getElementById("pantalla-premio").style.display = "flex";
+        }
+
+        function guardarYBloquear() {
+            document.getElementById("pantalla-premio").style.display = "none";
+            activarPantallaBloqueo();
+        }
+    </script>
+</body>
+  </html>
+  
